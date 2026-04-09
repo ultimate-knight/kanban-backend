@@ -8,4 +8,6 @@ app.use(cors())
 
 app.use("/api/auth",require("./routes/auth.routes"))
 
+app.use("/api/applications", require("./routes/app.routes"));
+
 module.exports=app
