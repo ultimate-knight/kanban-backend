@@ -7,7 +7,7 @@ router.use(auth)
 
 router.post("/", createApp);
 router.get("/", getApp);
-router.patch("/:id", updateApp);
+router.put("/:id", updateApp);
 router.delete("/:id", deleteApp);
 
 module.exports = router;

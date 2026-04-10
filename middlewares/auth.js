@@ -2,10 +2,10 @@ const jwt=require("jsonwebtoken")
 
 
 module.exports=(req,res,next)=>{
-    const token=req.headers.authorization
+    const token=req.headers.authorization?.split(" ")[1]
 
     if(!token){
-        res.status(401).json({Message:"Invalid token"})
+        return res.status(401).json({Message:"Invalid token"})
     }
 
     try {
@@ -13,6 +13,6 @@ module.exports=(req,res,next)=>{
         req.user=decoded.id
         next()
     } catch (error) {
-        res.status(500).json({Msg:error.Message})
+        return res.status(500).json({Msg:error.message})
     }
 }
