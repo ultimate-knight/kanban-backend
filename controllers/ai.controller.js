@@ -1,6 +1,6 @@
 const {parseJD}=require("../services/ai.service")
 
-exports.parseJD=async (req,res)=>{
+exports.parse=async (req,res)=>{
     try {
         const data=await parseJD(req.body.jd)
 
