@@ -10,4 +10,6 @@ app.use("/api/auth",require("./routes/auth.routes"))
 
 app.use("/api/applications", require("./routes/app.routes"));
 
+app.use("/api/ai", require("./routes/ai.routes"));
+
 module.exports=app
