@@ -1,15 +1,15 @@
-import mongoose from 'mongoose'
-import dotenv from 'dotenv'
+import mongoose from "mongoose";
 
-dotenv.config()
 
 const dbConnect = async (): Promise<void> => {
-    try {
-        await mongoose.connect(process.env.MONGO_URI as string)
-        console.log("Mongodb connected")
-    } catch (error) {
-        console.log("error", error)
-    }
-}
+  const mongoUri = process.env.MONGODB_URI;
 
-export default dbConnect
+  if (!mongoUri) {
+    throw new Error("MONGODB_URI is not configured.");
+  }
+
+  await mongoose.connect(mongoUri);
+  console.log("MongoDB connected");
+};
+
+export default dbConnect;

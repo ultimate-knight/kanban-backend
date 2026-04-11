@@ -1,21 +1,20 @@
-import express, { Router } from 'express'
-import auth from '../middlewares/auth'
-import { createApp, getApp, updateApp, deleteApp } from '../controllers/app.controller'
+import express, { Router } from "express";
+import {
+  createApplication,
+  deleteApplication,
+  getApplicationById,
+  getApplications,
+  updateApplication,
+} from "../controllers/app.controller";
+import auth from "../middlewares/auth";
 
-const router: Router = express.Router()
+const router: Router = express.Router();
 
-router.use(auth)
-
-router.post("/", createApp);
-router.get("/", getApp);
-router.put("/:id", updateApp);
-router.delete("/:id", deleteApp);
+router.use(auth);
+router.post("/", createApplication);
+router.get("/", getApplications);
+router.get("/:id", getApplicationById);
+router.put("/:id", updateApplication);
+router.delete("/:id", deleteApplication);
 
 export default router;
-
-router.post("/", createApp);
-router.get("/", getApp);
-router.put("/:id", updateApp);
-router.delete("/:id", deleteApp);
-
-module.exports = router;

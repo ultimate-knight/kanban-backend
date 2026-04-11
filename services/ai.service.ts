@@ -1,102 +1,146 @@
-import Groq from 'groq-sdk';
+import Groq from "groq-sdk";
 
-console.log("🔑 GROK_API_KEY loaded:", process.env.GROK_API_KEY ? "✓ (exists)" : "✗ (missing)");
+export interface ParsedJobDescription {
+  company: string;
+  role: string;
+  requiredSkills: string[];
+  niceToHaveSkills: string[];
+  seniority: string;
+  location: string;
+  suggestions: string[];
+}
 
 let client: Groq | null = null;
 
 const getClient = (): Groq => {
   if (!client) {
-    if (!process.env.GROK_API_KEY) {
-      throw new Error("GROK_API_KEY environment variable is not set.");
+    if (!process.env.GROK_KEY) {
+      throw new Error("GROK_KEY is not configured.");
     }
-    client = new Groq({ apiKey: process.env.GROK_API_KEY });
+
+    client = new Groq({
+      apiKey: process.env.GROK_KEY,
+    });
   }
+
   return client;
 };
 
-export const parseJD = async (jd: string): Promise<any> => {
+const fallbackParsedResponse = (): ParsedJobDescription => ({
+  company: "",
+  role: "",
+  requiredSkills: [],
+  niceToHaveSkills: [],
+  seniority: "",
+  location: "",
+  suggestions: [],
+});
+
+const normalizeStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 10);
+};
+
+const safeJsonParse = (content: string): Record<string, unknown> => {
   try {
-    console.log("📝 Parsing JD with Llama 3.3 70B on Groq...");
+    return JSON.parse(content) as Record<string, unknown>;
+  } catch {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    }
+    throw new Error("AI returned invalid JSON.");
+  }
+};
 
-    const groqClient = getClient();
+export const parseJobDescription = async (
+  jd: string
+): Promise<ParsedJobDescription> => {
+  const cleanJd = jd.trim();
 
-    const response = await groqClient.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert HR and career coach. Always respond with valid JSON only. Never add explanations or markdown."
-        },
-        {
-          role: "user",
-          content: `Analyze the following Job Description and return ONLY a valid JSON object.
+  if (!cleanJd) {
+    throw new Error("Job description is required.");
+  }
 
-Job Description:
-${jd}
+  const groq = getClient();
 
-Return the response in this exact JSON format:
+  const response = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You extract structured hiring data from job descriptions. Return ONLY valid JSON. Do not include markdown, explanations, or extra text. Suggestions must be specific to the role, achievement-oriented, and resume-ready.",
+      },
+      {
+        role: "user",
+        content: `Analyze this job description and extract the following fields:
+
+- company
+- role
+- requiredSkills (array of strings)
+- niceToHaveSkills (array of strings)
+- seniority
+- location
+- suggestions (array of 3 to 5 tailored resume bullet points)
+
+Rules:
+- Return ONLY valid JSON
+- Do not wrap in markdown
+- Do not add any extra text
+- Suggestions must be specific to the role and responsibilities
+- Avoid generic advice
+- If a field is missing, return an empty string or empty array
+
+Use exactly this JSON shape:
 
 {
-  "company": "Company name or null if not mentioned",
-  "role": "Exact job title",
-  "skills": ["skill1", "skill2", "skill3"],
-  "seniority": "Junior | Mid-level | Senior | Lead | Executive",
-  "location": "City name or 'Remote' or 'Hybrid'",
-  "suggestions": [
-    "First strong resume bullet point",
-    "Second strong resume bullet point",
-    "Third strong resume bullet point",
-    "Fourth strong resume bullet point",
-    "Fifth strong resume bullet point"
-  ]
+  "company": "",
+  "role": "",
+  "requiredSkills": [],
+  "niceToHaveSkills": [],
+  "seniority": "",
+  "location": "",
+  "suggestions": []
 }
 
-Rules for "suggestions":
-- Generate 5 powerful, achievement-oriented bullet points suitable for this role.
-- Start each bullet with strong action verbs (Developed, Built, Implemented, Optimized, Led, etc.).
-- Make them sound professional and impactful.
-- Do not mention the company name in the suggestions.
-- Focus on skills and responsibilities mentioned in the JD.`
-        }
-      ],
-      temperature: 0.2,
-      max_tokens: 900
-    });
+Job description:
+${cleanJd}`,
+      },
+    ],
+  });
 
-    console.log("✓ Groq Response received");
+  const content = response.choices[0]?.message?.content;
 
-    let content = response.choices[0].message.content?.trim() || '';
-
-    // Clean markdown code blocks if any
-    content = content.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
-
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch (e) {
-      console.error("JSON parsing failed. Raw output:", content);
-      parsed = {
-        company: null,
-        role: "Unknown",
-        skills: [],
-        seniority: "Unknown",
-        location: "Unknown",
-        suggestions: []
-      };
-    }
-
-    return parsed;
-
-  } catch (error: any) {
-    console.error("❌ Error Details:", error.message);
-    console.error("Status Code:", error.status);
-
-    if (error.status === 429) {
-      console.error("Rate limit hit on Groq. Wait 30-60 seconds and try again.");
-    } else if (error.status === 401) {
-      console.error("Invalid Groq API key! Use key from https://console.groq.com");
-    }
-
-    throw error;
+  if (!content) {
+    throw new Error("AI returned an empty response.");
   }
+
+  const parsed = safeJsonParse(content);
+
+  const result: ParsedJobDescription = {
+    ...fallbackParsedResponse(),
+    company: typeof parsed.company === "string" ? parsed.company.trim() : "",
+    role: typeof parsed.role === "string" ? parsed.role.trim() : "",
+    requiredSkills: normalizeStringArray(parsed.requiredSkills),
+    niceToHaveSkills: normalizeStringArray(parsed.niceToHaveSkills),
+    seniority: typeof parsed.seniority === "string" ? parsed.seniority.trim() : "",
+    location: typeof parsed.location === "string" ? parsed.location.trim() : "",
+    suggestions: normalizeStringArray(parsed.suggestions).slice(0, 5),
+  };
+
+  if (!result.role) {
+    throw new Error("AI response was missing the role.");
+  }
+
+  if (result.suggestions.length < 3) {
+    throw new Error("AI response did not contain enough suggestions.");
+  }
+
+  return result;
 };

@@ -1,31 +1,100 @@
-import mongoose from 'mongoose'
+import mongoose, { Types } from "mongoose";
 
-const appSchema = new mongoose.Schema({
+export const APPLICATION_STATUSES = [
+  "Applied",
+  "Phone Screen",
+  "Interview",
+  "Offer",
+  "Rejected",
+] as const;
+
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
+
+export interface IApplication {
+  userId: Types.ObjectId;
+  company: string;
+  role: string;
+  jdText?: string;
+  jdLink?: string;
+  notes?: string;
+  dateApplied: Date;
+  status: ApplicationStatus;
+  salaryRange?: string;
+  location?: string;
+  seniority?: string;
+  requiredSkills: string[];
+  niceToHaveSkills: string[];
+  suggestions: string[];
+}
+
+const applicationSchema = new mongoose.Schema<IApplication>(
+  {
     userId: {
-        type: String
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
     },
     company: {
-        type: String
+      type: String,
+      required: true,
+      trim: true,
     },
     role: {
-        type: String
+      type: String,
+      required: true,
+      trim: true,
     },
-    status: {
-        type: String,
-        enum: ["applied", "Phone Screen", "Interview", "Offer", "Rejected"],
-        default: "applied"
+    jdText: {
+      type: String,
+      default: "",
     },
-    dateapplied: {
-        type: Date
+    jdLink: {
+      type: String,
+      default: "",
     },
     notes: {
-        type: String
+      type: String,
+      default: "",
+    },
+    dateApplied: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    status: {
+      type: String,
+      enum: APPLICATION_STATUSES,
+      default: "Applied",
     },
     salaryRange: {
-        type: String
-    }
-}, { timestamps: true })
+      type: String,
+      default: "",
+    },
+    location: {
+      type: String,
+      default: "",
+    },
+    seniority: {
+      type: String,
+      default: "",
+    },
+    requiredSkills: {
+      type: [String],
+      default: [],
+    },
+    niceToHaveSkills: {
+      type: [String],
+      default: [],
+    },
+    suggestions: {
+      type: [String],
+      default: [],
+    },
+  },
+  { timestamps: true }
+);
 
-const appModel = mongoose.model("App", appSchema);
+const Application = mongoose.model<IApplication>("Application", applicationSchema);
 
-export default appModel
+export default Application;

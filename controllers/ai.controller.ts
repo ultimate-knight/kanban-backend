@@ -1,23 +1,23 @@
-import { Request, Response } from 'express'
-import { parseJD } from '../services/ai.service'
+import { Response } from "express";
+import { AuthenticatedRequest } from "../middlewares/auth";
+import { parseJobDescription } from "../services/ai.service";
 
-export const parse = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const data = await parseJD(req.body.jd)
+export const parseJobDescriptionController = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { jd } = req.body as { jd?: string };
 
-        res.json(data)
-    } catch (error: any) {
-        console.log("AI Service Error:", error);
-        
-        // Check for quota/rate limit errors
-        if (error.message?.includes("429") || error.message?.includes("quota") || error.message?.includes("RESOURCE_EXHAUSTED")) {
-            res.status(429).json({ 
-                msg: "Daily quota exceeded. Please try again tomorrow or upgrade your Google API plan.",
-                error: error.message 
-            });
-            return
-        }
-        
-        res.status(500).json({ msg: error.message || "AI error" });
+    if (!jd || !jd.trim()) {
+      res.status(400).json({ message: "Job description is required." });
+      return;
     }
-}
+
+    const data = await parseJobDescription(jd);
+    res.status(200).json(data);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "AI parsing failed.";
+    res.status(500).json({ message });
+  }
+};

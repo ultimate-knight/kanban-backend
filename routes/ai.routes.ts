@@ -1,8 +1,10 @@
-import express, { Router } from 'express'
-import * as ctrl from '../controllers/ai.controller'
+import express, { Router } from "express";
+import { parseJobDescriptionController } from "../controllers/ai.controller";
+import auth from "../middlewares/auth";
 
-const router: Router = express.Router()
+const router: Router = express.Router();
 
-router.post("/parse", ctrl.parse)
+router.use(auth);
+router.post("/parse", parseJobDescriptionController);
 
-export default router
+export default router;

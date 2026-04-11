@@ -1,75 +1,119 @@
-import { Request, Response } from 'express'
-import Application from '../models/app.models'
+import { Response } from "express";
+import { AuthenticatedRequest } from "../middlewares/auth";
+import Application, { APPLICATION_STATUSES } from "../models/app.models";
 
-export const createApp = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const data = await Application.create({
-            ...req.body,
-            userId: (req as any).user
-        })
+const normalizeStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
 
-        if (!data) {
-            res.status(400).json({ Message: "data is not available" })
-            return
-        }
+const buildPayload = (body: Record<string, unknown>) => ({
+  company: typeof body.company === "string" ? body.company.trim() : "",
+  role: typeof body.role === "string" ? body.role.trim() : "",
+  jdText: typeof body.jdText === "string" ? body.jdText : "",
+  jdLink: typeof body.jdLink === "string" ? body.jdLink : "",
+  notes: typeof body.notes === "string" ? body.notes : "",
+  dateApplied: body.dateApplied ? new Date(String(body.dateApplied)) : new Date(),
+  status: APPLICATION_STATUSES.includes(body.status as (typeof APPLICATION_STATUSES)[number])
+    ? (body.status as (typeof APPLICATION_STATUSES)[number])
+    : "Applied",
+  salaryRange: typeof body.salaryRange === "string" ? body.salaryRange : "",
+  location: typeof body.location === "string" ? body.location : "",
+  seniority: typeof body.seniority === "string" ? body.seniority : "",
+  requiredSkills: normalizeStringArray(body.requiredSkills),
+  niceToHaveSkills: normalizeStringArray(body.niceToHaveSkills),
+  suggestions: normalizeStringArray(body.suggestions).slice(0, 5),
+});
 
-        res.status(201).json({ result: data })
-    } catch (error: any) {
-        console.log("error", error.message)
-        res.status(500).json({ Message: error.message })
+export const createApplication = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const payload = buildPayload(req.body as Record<string, unknown>);
+
+    if (!payload.company || !payload.role) {
+      res.status(400).json({ message: "Company and role are required." });
+      return;
     }
-}
 
-export const getApp = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const data = await Application.find({})
+    const application = await Application.create({
+      ...payload,
+      userId: req.userId,
+    });
 
-        if (!data) {
-            res.status(400).json({ Message: "data is not available" })
-            return
-        }
+    res.status(201).json({ application });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to create application.";
+    res.status(500).json({ message });
+  }
+};
 
-        res.status(200).json({ result: data })
-    } catch (error: any) {
-        console.log("error", error.message)
-        res.status(500).json({ Message: error.message })
+export const getApplications = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const applications = await Application.find({ userId: req.userId }).sort({ createdAt: -1 });
+    res.status(200).json({ applications });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch applications.";
+    res.status(500).json({ message });
+  }
+};
+
+export const getApplicationById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const application = await Application.findOne({ _id: req.params.id, userId: req.userId });
+
+    if (!application) {
+      res.status(404).json({ message: "Application not found." });
+      return;
     }
-}
 
-export const updateApp = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const data = await Application.findByIdAndUpdate(
-            {
-                _id: req.params.id,
-                userId: (req as any).userId 
-            },
-            req.body,
-            { new: true }          
-        )
+    res.status(200).json({ application });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch application.";
+    res.status(500).json({ message });
+  }
+};
 
-        if (!data) {
-            res.status(400).json({ Message: "data cannot be updated" })
-            return
-        }
+export const updateApplication = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const payload = buildPayload(req.body as Record<string, unknown>);
 
-        res.status(200).json(data)
-        
-    } catch (error: any) {
-        console.log("error", error.message)
-        res.status(500).json({ Message: error.message })
+    if (!payload.company || !payload.role) {
+      res.status(400).json({ message: "Company and role are required." });
+      return;
     }
-}
 
-export const deleteApp = async (req: Request, res: Response): Promise<void> => {
-    try {
-        await Application.findByIdAndDelete({
-            _id: req.params.id
-        })
+    const application = await Application.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      payload,
+      { new: true, runValidators: true }
+    );
 
-        res.status(200).json({ Message: "message deleted successfully" })
-        
-    } catch (error: any) {
-        console.log("error", error.message)
-        res.status(500).json({ Message: error.message })
+    if (!application) {
+      res.status(404).json({ message: "Application not found." });
+      return;
     }
-}
+
+    res.status(200).json({ application });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update application.";
+    res.status(500).json({ message });
+  }
+};
+
+export const deleteApplication = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const application = await Application.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+
+    if (!application) {
+      res.status(404).json({ message: "Application not found." });
+      return;
+    }
+
+    res.status(200).json({ message: "Application deleted successfully." });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete application.";
+    res.status(500).json({ message });
+  }
+};
